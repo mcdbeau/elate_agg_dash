@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Elate Store Dashboards</title>
+  <style>
+    :root {
+      --bg: #1a1a1a;
+      --tile-bg: #ffffff;
+      --header-bg: #da291c;
+      --header-fg: #ffffff;
+      --accent: #ffc72c;
+      --gap: 10px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      color: #fff;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    header h1 { font-size: 1.1rem; margin: 0; }
+    header .controls { display: flex; gap: 8px; align-items: center; font-size: 0.85rem; }
+    header button {
+      background: var(--accent);
+      border: 0;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #updated { opacity: 0.7; }
+
+    /* Mobile: stack tiles, scroll in order */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--gap);
+      padding: 0 var(--gap) var(--gap);
+      flex: 1;
+    }
+    .tile {
+      display: flex;
+      flex-direction: column;
+      background: var(--tile-bg);
+      border: 3px solid var(--header-bg);
+      border-radius: 6px;
+      overflow: hidden;
+      height: 85vh;
+      min-height: 0;
+    }
+    .tile-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--header-bg);
+      color: var(--header-fg);
+      padding: 4px 10px;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .tile-header .store-num {
+      background: var(--accent);
+      color: #000;
+      border-radius: 4px;
+      padding: 1px 8px;
+      margin-left: 6px;
+    }
+    .tile-header a {
+      color: var(--header-fg);
+      font-size: 0.8rem;
+      font-weight: 400;
+      text-decoration: none;
+      opacity: 0.9;
+    }
+    .tile-header a:hover { text-decoration: underline; }
+    .tile iframe {
+      flex: 1;
+      width: 100%;
+      border: 0;
+      min-height: 0;
+    }
+
+    .missing {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      text-align: center;
+      color: #555;
+    }
+
+    /* Tablet / small laptop: 2 columns x 3 rows, fills the screen */
+    @media (min-width: 900px) {
+      body { height: 100vh; overflow: hidden; }
+      .grid {
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        min-height: 0;
+      }
+      .tile { height: auto; }
+    }
+
+    /* Large displays: 3 columns x 2 rows */
+    @media (min-width: 1400px) {
+      .grid {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Elate Store Dashboards</h1>
+    <div class="controls">
+      <span id="updated"></span>
+      <button id="refresh" type="button">Refresh all</button>
+    </div>
+  </header>
+
+  <main class="grid" id="grid"></main>
+
+  <script>
+    // Store numbers, in display order. Passwords are NOT stored here —
+    // they come from the URL fragment, e.g.  index.html#4453=abc&4578=def
+    // (the part after # is never sent to the web server).
+    const STORES = ["4453", "4578", "10514", "11785", "11960", "18056"];
+
+    // Auto-refresh interval in minutes (0 to disable).
+    const AUTO_REFRESH_MINUTES = 5;
+
+    const urlFor = (store, password) =>
+      `https://elatemcd.com/elate_dashboard/store/${encodeURIComponent(store)}/service?password=${encodeURIComponent(password)}`;
+
+    const grid = document.getElementById("grid");
+    let frames = [];
+
+    function render() {
+      const passwords = new URLSearchParams(location.hash.slice(1));
+      grid.textContent = "";
+      frames = [];
+
+      for (const store of STORES) {
+        const password = passwords.get(store);
+        const tile = document.createElement("section");
+        tile.className = "tile";
+
+        const header = document.createElement("div");
+        header.className = "tile-header";
+        header.innerHTML = `<span>Store<span class="store-num">#${store}</span></span>`;
+        tile.appendChild(header);
+
+        if (password) {
+          const url = urlFor(store, password);
+          const link = document.createElement("a");
+          link.href = url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.innerHTML = "Open &#8599;";
+          header.appendChild(link);
+
+          const iframe = document.createElement("iframe");
+          iframe.src = url;
+          iframe.title = `Store ${store} dashboard`;
+          iframe.loading = "lazy";
+          tile.appendChild(iframe);
+          frames.push({ el: iframe, url });
+        } else {
+          const msg = document.createElement("div");
+          msg.className = "missing";
+          msg.textContent = `No password for store ${store} in this link.`;
+          tile.appendChild(msg);
+        }
+        grid.appendChild(tile);
+      }
+    }
+
+    render();
+    window.addEventListener("hashchange", render);
+
+    const updated = document.getElementById("updated");
+    function stamp() {
+      updated.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+    function refreshAll() {
+      for (const f of frames) f.el.src = f.url;
+      stamp();
+    }
+    document.getElementById("refresh").addEventListener("click", refreshAll);
+    stamp();
+    if (AUTO_REFRESH_MINUTES > 0) setInterval(refreshAll, AUTO_REFRESH_MINUTES * 60 * 1000);
+  </script>
+</body>
+</html>
